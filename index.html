@@ -52,9 +52,10 @@ select{padding:4px 8px;border-radius:8px;border:1px solid var(--bd);background:v
 <div id="toasts"></div>
 <main>
 <h1><svg width="38" height="38" viewBox="0 0 256 256" style="vertical-align:middle;margin-inline-end:8px" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e2a78"/><stop offset="1" stop-color="#3a6cff"/></linearGradient></defs><rect width="256" height="256" rx="58" fill="url(#lg)"/><circle cx="128" cy="128" r="84" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-dasharray="470 58" transform="rotate(-60 128 128)"/><path d="M102 112v52M128 100v58M154 90v60" stroke="#fff" stroke-width="5" stroke-linecap="round"/><rect x="94" y="126" width="16" height="26" rx="3" fill="#2fd37a"/><rect x="120" y="112" width="16" height="30" rx="3" fill="#ff5c5c"/><rect x="146" y="100" width="16" height="32" rx="3" fill="#2fd37a"/><circle cx="178" cy="56" r="19" fill="#ffc233" stroke="#1e2a78" stroke-width="6"/></svg>زنگ بازارهای مالی</h1>
+<div class="row" style="margin:4px 0 10px"><button class="b" id="hub" style="font-size:1rem;padding:8px 18px">🔔 مرکز هشدارها</button></div>
 <div class="sub">ساعت‌ها به وقت محلی شما (<span id="tz" class="t"></span>) نمایش داده می‌شوند. برای هشدار، این صفحه باید باز بماند.</div>
 
-<section class="panel">
+<section class="panel" id="setp" style="display:none">
 <h2>تنظیم هشدار</h2>
 <div class="row"><span>چند دقیقه قبل هشدار بده:</span><span id="leads" class="row" style="margin:0"></span></div>
 <div class="row"><span>صدای هشدار:</span><select id="snd"></select><button class="chip" id="prev">▶ پخش</button><button class="chip" id="stop">■ توقف</button></div>
@@ -192,7 +193,7 @@ M.forEach(m=>{
   grid.appendChild(c);
   const bell=c.querySelector('.bell');
   const sync=()=>bell.classList.toggle('on',!S.off.includes(m.id));sync();
-  bell.onclick=()=>openAlerts(m.id);
+  bell.onclick=()=>openHub(m.id);
   c.querySelector('.hrs').innerHTML=m.sess?m.txt:m.all?'۲۴ ساعته، ۷ روز هفته':m.gx?'یکشنبه ۱۸:۰۰ تا جمعه ۱۷:۰۰ (نیویورک)، وقفه روزانه ۱۷:۰۰ تا ۱۸:۰۰':m.fx?'یکشنبه ۱۷:۰۰ تا جمعه ۱۷:۰۰ (نیویورک)':`ساعت محلی: <span class="t">${String(m.o[0]).padStart(2,'0')}:${String(m.o[1]).padStart(2,'0')} – ${String(m.c[0]).padStart(2,'0')}:${String(m.c[1]).padStart(2,'0')}</span>`;
   st[m.id]={el:c,next:null,fired:new Set()};
   c.querySelector('.up').onclick=()=>moveM(m.id,-1);c.querySelector('.dn').onclick=()=>moveM(m.id,1);
@@ -217,6 +218,42 @@ async function refreshQuotes(){
     el.innerHTML=L.map(([n,s])=>{const r=q[s];if(!r)return '<span class="q"><b>'+n+'</b> —</span>';const ch=(r.price-r.prev)/r.prev*100;
       return '<span class="q"><b>'+n+'</b> '+fmtP(r.price)+' <span class="'+(ch>=0?'gain':'loss')+'">'+(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%</span></span>'}).join('')});
   $('qs').textContent='آخرین به‌روزرسانی قیمت: '+new Date().toLocaleTimeString('en-GB')+' — داده Yahoo Finance، ممکن است با تأخیر و با قیمت بروکر کمی تفاوت داشته باشد.';
+}
+function openHub(mid){
+  S.pa=S.pa||[];const MK=M.filter(m=>SYM[m.id]);
+  const ov=document.createElement('div');ov.className='ov';const d=document.createElement('div');d.className='dlg';d.style.maxWidth='580px';ov.appendChild(d);
+  const setp=$('setp');
+  const close=()=>{setp.style.cssText='display:none';document.body.appendChild(setp);ov.remove();syncBells()};
+  ov.onclick=e=>{if(e.target===ov)close()};
+  let selM=SYM[mid]?mid:MK[0].id;
+  const draw=()=>{
+    d.innerHTML='<h3>🔔 مرکز هشدارها</h3>'+
+    '<div class="sec"><b>هشدار قیمت</b><div class="row" style="margin-top:8px"><select id="hM"></select><select id="hS"></select></div>'+
+    '<div class="row"><select id="hD"><option value="above">به بالاتر از این رسید</option><option value="below">به پایین‌تر از این رسید</option></select><input type="number" id="hP" step="any" placeholder="قیمت" style="width:110px"><button class="b" id="hA">افزودن هشدار</button></div>'+
+    '<div class="meta" id="hC"></div><div id="hL"></div></div>'+
+    '<div class="sec"><b>هشدار باز و بسته شدن بازارها</b><div id="hO" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 10px;margin-top:8px"></div></div>'+
+    '<div class="sec"><b>تنظیمات زمان و صدا</b><div id="hSet" style="margin-top:8px"></div></div>'+
+    '<div class="row" style="margin-top:12px;justify-content:flex-end"><button class="b" id="hX">بستن</button></div>';
+    const hM=d.querySelector('#hM'),hS=d.querySelector('#hS'),hC=d.querySelector('#hC');
+    MK.forEach(m=>hM.add(new Option(m.n,m.id)));hM.value=selM;
+    const cur=()=>{const r=Q[hS.value];hC.textContent=r?'قیمت فعلی: '+fmtP(r.price):'قیمت فعلی در دسترس نیست (فقط در نسخه ویندوز یا سایت).'};
+    const fillS=()=>{hS.innerHTML='';SYM[hM.value].forEach(([n,s])=>hS.add(new Option(n,s)));cur()};
+    hM.onchange=()=>{selM=hM.value;fillS()};hS.onchange=cur;fillS();
+    d.querySelector('#hA').onclick=()=>{const v=parseFloat(d.querySelector('#hP').value);if(!(v>0))return;const s=hS.value,n=SYM[hM.value].find(x=>x[1]===s)[0];
+      S.pa.push({id:Date.now()+Math.random(),mid:hM.value,sym:s,name:n,dir:d.querySelector('#hD').value,price:v,done:false});save();draw()};
+    const L=d.querySelector('#hL');
+    S.pa.forEach(a=>{const mk=M.find(x=>x.id===a.mid);const r=document.createElement('div');r.className='pa'+(a.done?' done':'');
+      r.innerHTML='<span>'+(mk?mk.n+' — ':'')+'<span class="t">'+a.name+' '+(a.dir==='above'?'≥':'≤')+' '+fmtP(a.price)+(a.done?' ✓':'')+'</span></span>';
+      const x=document.createElement('button');x.className='chip';x.textContent=a.done?'حذف':'لغو';
+      x.onclick=()=>{S.pa=S.pa.filter(y=>y.id!==a.id);save();draw()};r.appendChild(x);L.appendChild(r)});
+    if(!S.pa.length)L.innerHTML='<div class="meta">هنوز هشدار قیمتی نساخته‌ای.</div>';
+    const O=d.querySelector('#hO');
+    M.forEach(m=>{const lb=document.createElement('label'),cb=document.createElement('input');cb.type='checkbox';cb.checked=!S.off.includes(m.id);
+      cb.onchange=()=>{S.off=cb.checked?S.off.filter(x=>x!==m.id):[...S.off,m.id];save()};lb.appendChild(cb);lb.appendChild(document.createTextNode(' '+m.n));O.appendChild(lb)});
+    setp.style.cssText='display:block;border:0;padding:0;margin:0;background:none';d.querySelector('#hSet').appendChild(setp);
+    d.querySelector('#hX').onclick=close;
+  };
+  draw();document.body.appendChild(ov);
 }
 function syncBells(){M.forEach(m=>{const b=st[m.id].el.querySelector('.bell');const n=(S.pa||[]).filter(a=>a.mid===m.id&&!a.done).length;
   b.classList.toggle('on',!S.off.includes(m.id)||n>0);
@@ -306,7 +343,7 @@ function tick(){
     });
   });
 }
-renderLeads();applyOrder();renderSel();applyVis();syncBells();refreshQuotes();setInterval(refreshQuotes,60000);tick();setInterval(tick,1000);
+renderLeads();applyOrder();renderSel();applyVis();syncBells();$('hub').onclick=()=>openHub();refreshQuotes();setInterval(refreshQuotes,60000);tick();setInterval(tick,1000);
 </script>
 </body>
 </html>
