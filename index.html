@@ -206,7 +206,7 @@ const SYM={
  ist:[['BIST 100','XU100.IS']],nse:[['Nifty','^NSEI']],asx:[['ASX 200','^AXJO']],
  fx:[['EURUSD','EURUSD=X'],['GBPUSD','GBPUSD=X'],['USDJPY','JPY=X'],['USDCHF','CHF=X'],['AUDUSD','AUDUSD=X'],['USDCAD','CAD=X'],['NZDUSD','NZDUSD=X'],['EURJPY','EURJPY=X'],['GBPJPY','GBPJPY=X'],['EURGBP','EURGBP=X']],
  gold:[['Gold','GC=F'],['Silver','SI=F']],usf:[['ES','ES=F'],['YM','YM=F'],['NQ','NQ=F']],
- wti:[['WTI','CL=F']],xau:[['XAUUSD','XAUUSD=X']],btc:[['BTC','BTC-USD'],['ETH','ETH-USD']]
+ wti:[['WTI','CL=F']],xau:[['XAUUSD','XAUUSD=X']],btc:[['BTC','BTC-USD'],['ETH','ETH-USD'],['LTC','LTC-USD']]
 };
 const fmtP=v=>v>=1000?v.toLocaleString('en-US',{maximumFractionDigits:2}):v>=10?v.toFixed(2):v.toFixed(4);
 async function refreshQuotes(){
