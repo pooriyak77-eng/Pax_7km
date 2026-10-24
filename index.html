@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%231e2a78'/><stop offset='1' stop-color='%233a6cff'/></linearGradient></defs><rect width='256' height='256' rx='58' fill='url(%23g)'/><circle cx='128' cy='128' r='84' fill='none' stroke='white' stroke-width='12' stroke-linecap='round' stroke-dasharray='470 58' transform='rotate(-60 128 128)'/><path d='M102 112v52M128 100v58M154 90v60' stroke='white' stroke-width='5' stroke-linecap='round'/><rect x='94' y='126' width='16' height='26' rx='3' fill='%232fd37a'/><rect x='120' y='112' width='16' height='30' rx='3' fill='%23ff5c5c'/><rect x='146' y='100' width='16' height='32' rx='3' fill='%232fd37a'/><circle cx='178' cy='56' r='19' fill='%23ffc233' stroke='%231e2a78' stroke-width='6'/></svg>">
 <title>زنگ بازارهای مالی</title>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--tx:#14181f;--mut:#667085;--bd:#e3e6ec;--ok:#12a150;--bad:#d92d20;--ac:#2f5bea;--chip:#eef1f7;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
@@ -36,6 +37,10 @@ select{padding:4px 8px;border-radius:8px;border:1px solid var(--bd);background:v
 .mv{background:none;border:1px solid var(--bd);color:var(--tx);border-radius:6px;cursor:pointer;font-size:.65rem;padding:0 6px;line-height:1.6}
 .px{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 2px;font-size:.85rem;direction:ltr;justify-content:flex-end}
 .q b{color:var(--mut);font-weight:600}.gain{color:var(--ok)}.loss{color:var(--bad)}
+.ov{position:fixed;inset:0;background:#0008;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px}
+.dlg{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:14px;padding:16px;max-width:460px;width:100%;max-height:85vh;overflow:auto}
+.dlg h3{margin:0 0 10px;font-size:1rem}.dlg .sec{border-top:1px solid var(--bd);padding-top:10px;margin-top:10px}
+.pa{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:.9rem;padding:4px 0}.pa.done{opacity:.55}
 .bell{background:none;border:0;font-size:1.2rem;cursor:pointer;opacity:.4}
 .bell.on{opacity:1}
 .t{direction:ltr;unicode-bidi:embed}
@@ -46,7 +51,7 @@ select{padding:4px 8px;border-radius:8px;border:1px solid var(--bd);background:v
 <body>
 <div id="toasts"></div>
 <main>
-<h1>⏰ زنگ بازارهای مالی</h1>
+<h1><svg width="38" height="38" viewBox="0 0 256 256" style="vertical-align:middle;margin-inline-end:8px" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e2a78"/><stop offset="1" stop-color="#3a6cff"/></linearGradient></defs><rect width="256" height="256" rx="58" fill="url(#lg)"/><circle cx="128" cy="128" r="84" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-dasharray="470 58" transform="rotate(-60 128 128)"/><path d="M102 112v52M128 100v58M154 90v60" stroke="#fff" stroke-width="5" stroke-linecap="round"/><rect x="94" y="126" width="16" height="26" rx="3" fill="#2fd37a"/><rect x="120" y="112" width="16" height="30" rx="3" fill="#ff5c5c"/><rect x="146" y="100" width="16" height="32" rx="3" fill="#2fd37a"/><circle cx="178" cy="56" r="19" fill="#ffc233" stroke="#1e2a78" stroke-width="6"/></svg>زنگ بازارهای مالی</h1>
 <div class="sub">ساعت‌ها به وقت محلی شما (<span id="tz" class="t"></span>) نمایش داده می‌شوند. برای هشدار، این صفحه باید باز بماند.</div>
 
 <section class="panel">
@@ -187,7 +192,7 @@ M.forEach(m=>{
   grid.appendChild(c);
   const bell=c.querySelector('.bell');
   const sync=()=>bell.classList.toggle('on',!S.off.includes(m.id));sync();
-  bell.onclick=()=>{S.off=S.off.includes(m.id)?S.off.filter(x=>x!==m.id):[...S.off,m.id];save();sync()};
+  bell.onclick=()=>openAlerts(m.id);
   c.querySelector('.hrs').innerHTML=m.sess?m.txt:m.all?'۲۴ ساعته، ۷ روز هفته':m.gx?'یکشنبه ۱۸:۰۰ تا جمعه ۱۷:۰۰ (نیویورک)، وقفه روزانه ۱۷:۰۰ تا ۱۸:۰۰':m.fx?'یکشنبه ۱۷:۰۰ تا جمعه ۱۷:۰۰ (نیویورک)':`ساعت محلی: <span class="t">${String(m.o[0]).padStart(2,'0')}:${String(m.o[1]).padStart(2,'0')} – ${String(m.c[0]).padStart(2,'0')}:${String(m.c[1]).padStart(2,'0')}</span>`;
   st[m.id]={el:c,next:null,fired:new Set()};
   c.querySelector('.up').onclick=()=>moveM(m.id,-1);c.querySelector('.dn').onclick=()=>moveM(m.id,1);
@@ -207,11 +212,44 @@ async function refreshQuotes(){
   if(!window.quoteApi){$('qs').textContent='قیمت زنده فقط در نسخه ویندوز فعال است (مرورگر اجازه دریافت قیمت نمی‌دهد).';return}
   const all=[...new Set(Object.values(SYM).flat().map(x=>x[1]))];
   let q={};try{q=await window.quoteApi.get(all)}catch(e){}
-  Q=q;renderBig();
+  Q=q;renderBig();checkPA();
   M.forEach(m=>{const L=SYM[m.id];if(!L||L.length>3)return;const el=st[m.id].el.querySelector('.px');
     el.innerHTML=L.map(([n,s])=>{const r=q[s];if(!r)return '<span class="q"><b>'+n+'</b> —</span>';const ch=(r.price-r.prev)/r.prev*100;
       return '<span class="q"><b>'+n+'</b> '+fmtP(r.price)+' <span class="'+(ch>=0?'gain':'loss')+'">'+(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%</span></span>'}).join('')});
   $('qs').textContent='آخرین به‌روزرسانی قیمت: '+new Date().toLocaleTimeString('en-GB')+' — داده Yahoo Finance، ممکن است با تأخیر و با قیمت بروکر کمی تفاوت داشته باشد.';
+}
+function syncBells(){M.forEach(m=>{const b=st[m.id].el.querySelector('.bell');const n=(S.pa||[]).filter(a=>a.mid===m.id&&!a.done).length;
+  b.classList.toggle('on',!S.off.includes(m.id)||n>0);
+  b.innerHTML='🔔'+(n?'<sup style="font-size:.6rem;color:var(--ac)"> '+n+'</sup>':'')})}
+function checkPA(){(S.pa||[]).forEach(a=>{if(a.done)return;const r=Q[a.sym];if(!r)return;
+  const hit=a.dir==='above'?r.price>=a.price:r.price<=a.price;
+  if(hit){a.done=true;save();alertUser('🎯 '+a.name+' به '+fmtP(r.price)+' رسید (هدف: '+(a.dir==='above'?'≥ ':'≤ ')+fmtP(a.price)+')');syncBells()}})}
+function openAlerts(mid){
+  const m=M.find(x=>x.id===mid),L=SYM[mid]||[];S.pa=S.pa||[];
+  const ov=document.createElement('div');ov.className='ov';const d=document.createElement('div');d.className='dlg';ov.appendChild(d);
+  const close=()=>{ov.remove();syncBells()};ov.onclick=e=>{if(e.target===ov)close()};
+  const draw=()=>{
+    d.innerHTML='<h3>🔔 هشدارهای '+m.n+'</h3>'+
+    '<label><input type="checkbox" id="dOc"> هشدار باز و بسته شدن بازار</label>'+
+    '<div class="meta">زمان‌های قبل از رویداد را در بخش «تنظیم هشدار» بالا یا کادر «تایمر اختصاصی» همین کارت تنظیم کن.</div>'+
+    '<div class="sec"><b>هشدار قیمت</b>'+(L.length?
+      '<div class="row" style="margin-top:8px"><select id="dSym"></select><select id="dDir"><option value="above">به بالاتر از این رسید</option><option value="below">به پایین‌تر از این رسید</option></select><input type="number" id="dPx" step="any" placeholder="قیمت" style="width:110px"><button class="b" id="dAdd">افزودن</button></div><div class="meta" id="dCur"></div>'
+      :'<div class="meta">برای این بازار قیمتی تعریف نشده است.</div>')+'<div id="dList"></div></div>'+
+    '<div class="row" style="margin-top:12px;justify-content:flex-end"><button class="b" id="dClose">بستن</button></div>';
+    const oc=d.querySelector('#dOc');oc.checked=!S.off.includes(mid);oc.onchange=()=>{S.off=oc.checked?S.off.filter(x=>x!==mid):[...S.off,mid];save()};
+    if(L.length){const sy=d.querySelector('#dSym');L.forEach(([n,s])=>sy.add(new Option(n,s)));
+      const cur=()=>{const r=Q[sy.value];d.querySelector('#dCur').textContent=r?'قیمت فعلی: '+fmtP(r.price):'قیمت فعلی در دسترس نیست (فقط در نسخه ویندوز یا سایت کار می‌کند).'};
+      sy.onchange=cur;cur();
+      d.querySelector('#dAdd').onclick=()=>{const v=parseFloat(d.querySelector('#dPx').value);if(!(v>0))return;
+        S.pa.push({id:Date.now()+Math.random(),mid,sym:sy.value,name:L.find(x=>x[1]===sy.value)[0],dir:d.querySelector('#dDir').value,price:v,done:false});save();draw()}}
+    const list=d.querySelector('#dList');
+    S.pa.filter(a=>a.mid===mid).forEach(a=>{const r=document.createElement('div');r.className='pa'+(a.done?' done':'');
+      r.innerHTML='<span class="t">'+a.name+' '+(a.dir==='above'?'≥':'≤')+' '+fmtP(a.price)+(a.done?' ✓':'')+'</span>';
+      const x=document.createElement('button');x.className='chip';x.textContent=a.done?'حذف':'لغو';
+      x.onclick=()=>{S.pa=S.pa.filter(y=>y.id!==a.id);save();draw()};r.appendChild(x);list.appendChild(r)});
+    d.querySelector('#dClose').onclick=close;
+  };
+  draw();document.body.appendChild(ov);
 }
 let Q={};
 function renderBig(){
@@ -268,7 +306,7 @@ function tick(){
     });
   });
 }
-renderLeads();applyOrder();renderSel();applyVis();refreshQuotes();setInterval(refreshQuotes,60000);tick();setInterval(tick,1000);
+renderLeads();applyOrder();renderSel();applyVis();syncBells();refreshQuotes();setInterval(refreshQuotes,60000);tick();setInterval(tick,1000);
 </script>
 </body>
 </html>
