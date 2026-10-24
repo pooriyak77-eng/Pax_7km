@@ -1,4 +1,4 @@
-ِ<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
@@ -86,6 +86,7 @@ const M=[
 {id:'gold',n:'طلا و نقره (COMEX)',tz:'America/New_York',gx:1},
 {id:'usf',n:'شاخص‌های آمریکا (داوجونز/S&P فیوچرز)',tz:'America/New_York',gx:1},
 {id:'wti',n:'نفت WTI (NYMEX)',tz:'America/New_York',gx:1},
+{id:'xau',n:'XAUUSD (سرمایه گذار برتر)',tz:'UTC',sess:{0:[[1321,1440]],1:[[0,1259],[1321,1440]],2:[[0,1259],[1321,1440]],3:[[0,1259],[1321,1440]],4:[[0,1259],[1321,1440]],5:[[0,1255]]},txt:'طبق Trade sessions بروکر (ساعت سرور، GMT): دوشنبه تا پنجشنبه ۰۰:۰۰–۲۰:۵۹ و ۲۲:۰۱–۲۴:۰۰؛ جمعه تا ۲۰:۵۵؛ یکشنبه از ۲۲:۰۱'},
 {id:'btc',n:'ارزهای دیجیتال',tz:'UTC',all:1}
 ];
 const WD={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
@@ -99,6 +100,7 @@ function isOpen(m,t){
   const {d,m:mn,ds}=parts(m.tz,t);
   if(m.hol&&m.hol.includes(ds))return false;
   if(m.xh&&m.xh.includes(ds.slice(5)))return false;
+  if(m.sess){const a=m.sess[d]||[];return a.some(([s,e])=>mn>=s&&mn<e)}
   if(m.all) return true;
   if(m.gx) return (d===0&&mn>=1080)||(d>=1&&d<=4&&!(mn>=1020&&mn<1080))||(d===5&&mn<1020);
   if(m.fx) return (d===0&&mn>=1020)||(d>=1&&d<=4)||(d===5&&mn<1020);
@@ -183,7 +185,7 @@ M.forEach(m=>{
   const bell=c.querySelector('.bell');
   const sync=()=>bell.classList.toggle('on',!S.off.includes(m.id));sync();
   bell.onclick=()=>{S.off=S.off.includes(m.id)?S.off.filter(x=>x!==m.id):[...S.off,m.id];save();sync()};
-  c.querySelector('.hrs').innerHTML=m.all?'۲۴ ساعته، ۷ روز هفته':m.gx?'یکشنبه ۱۸:۰۰ تا جمعه ۱۷:۰۰ (نیویورک)، وقفه روزانه ۱۷:۰۰ تا ۱۸:۰۰':m.fx?'یکشنبه ۱۷:۰۰ تا جمعه ۱۷:۰۰ (نیویورک)':`ساعت محلی: <span class="t">${String(m.o[0]).padStart(2,'0')}:${String(m.o[1]).padStart(2,'0')} – ${String(m.c[0]).padStart(2,'0')}:${String(m.c[1]).padStart(2,'0')}</span>`;
+  c.querySelector('.hrs').innerHTML=m.sess?m.txt:m.all?'۲۴ ساعته، ۷ روز هفته':m.gx?'یکشنبه ۱۸:۰۰ تا جمعه ۱۷:۰۰ (نیویورک)، وقفه روزانه ۱۷:۰۰ تا ۱۸:۰۰':m.fx?'یکشنبه ۱۷:۰۰ تا جمعه ۱۷:۰۰ (نیویورک)':`ساعت محلی: <span class="t">${String(m.o[0]).padStart(2,'0')}:${String(m.o[1]).padStart(2,'0')} – ${String(m.c[0]).padStart(2,'0')}:${String(m.c[1]).padStart(2,'0')}</span>`;
   st[m.id]={el:c,next:null,fired:new Set()};
   c.querySelector('.up').onclick=()=>moveM(m.id,-1);c.querySelector('.dn').onclick=()=>moveM(m.id,1);
   const mi=c.querySelector('.ml');mi.value=(S.ml[m.id]||[]).join(',');
