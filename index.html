@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ِ<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
@@ -33,6 +33,7 @@ label{font-size:.9rem;display:inline-flex;gap:6px;align-items:center}
 .meta{color:var(--mut);font-size:.8rem}
 select{padding:4px 8px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit;max-width:100%}
 .ml{width:100px;padding:2px 6px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit;direction:ltr}
+.mv{background:none;border:1px solid var(--bd);color:var(--tx);border-radius:6px;cursor:pointer;font-size:.65rem;padding:0 6px;line-height:1.6}
 .bell{background:none;border:0;font-size:1.2rem;cursor:pointer;opacity:.4}
 .bell.on{opacity:1}
 .t{direction:ltr;unicode-bidi:embed}
@@ -117,7 +118,7 @@ function hl(m,now){const ds=parts(m.tz,now).ds;let s='';const h=m.hol.find(x=>x>
 const lt=new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',weekday:'short'});
 const lt2=new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit'});
 document.getElementById('tz').textContent=Intl.DateTimeFormat().resolvedOptions().timeZone;
-let S={leads:[5,15],aOpen:true,aClose:true,aSound:true,off:[],hide:[],ml:{},snd:'beep',vol:.7,maxSec:10,cname:''};
+let S={leads:[5,15],aOpen:true,aClose:true,aSound:true,off:[],hide:[],ml:{},snd:'beep',vol:.7,maxSec:10,cname:'',order:[]};
 try{const x=JSON.parse(localStorage.getItem('mk-settings')||'null');if(x)S=Object.assign(S,x)}catch(e){}
 const save=()=>{try{localStorage.setItem('mk-settings',JSON.stringify(S))}catch(e){}};
 const $=id=>document.getElementById(id);
@@ -176,7 +177,7 @@ $('test').onclick=()=>alertUser('این یک هشدار آزمایشی است');
 const grid=$('grid'),st={};
 M.forEach(m=>{
   const c=document.createElement('div');c.className='card';
-  c.innerHTML=`<div class="top"><span class="name">${m.n}</span><span><span class="badge"></span> <button class="bell" title="هشدار این بازار">🔔</button></span></div>
+  c.innerHTML=`<div class="top"><span class="name">${m.n}</span><span><span class="badge"></span> <button class="mv up" title="جلوتر">▲</button><button class="mv dn" title="عقب‌تر">▼</button> <button class="bell" title="هشدار این بازار">🔔</button></span></div>
   <div class="meta hrs"></div><div class="meta nx"></div><div class="cd"></div><div class="meta at"></div><div class="meta hl"></div><div style="margin-top:8px"><label class="meta">تایمر اختصاصی (دقیقه، با کاما): <input class="ml" placeholder="3,20"></label></div>`;
   grid.appendChild(c);
   const bell=c.querySelector('.bell');
@@ -184,13 +185,17 @@ M.forEach(m=>{
   bell.onclick=()=>{S.off=S.off.includes(m.id)?S.off.filter(x=>x!==m.id):[...S.off,m.id];save();sync()};
   c.querySelector('.hrs').innerHTML=m.all?'۲۴ ساعته، ۷ روز هفته':m.gx?'یکشنبه ۱۸:۰۰ تا جمعه ۱۷:۰۰ (نیویورک)، وقفه روزانه ۱۷:۰۰ تا ۱۸:۰۰':m.fx?'یکشنبه ۱۷:۰۰ تا جمعه ۱۷:۰۰ (نیویورک)':`ساعت محلی: <span class="t">${String(m.o[0]).padStart(2,'0')}:${String(m.o[1]).padStart(2,'0')} – ${String(m.c[0]).padStart(2,'0')}:${String(m.c[1]).padStart(2,'0')}</span>`;
   st[m.id]={el:c,next:null,fired:new Set()};
+  c.querySelector('.up').onclick=()=>moveM(m.id,-1);c.querySelector('.dn').onclick=()=>moveM(m.id,1);
   const mi=c.querySelector('.ml');mi.value=(S.ml[m.id]||[]).join(',');
   mi.onchange=()=>{const a=mi.value.split(/[,،\s]+/).map(Number).filter(v=>v>=1&&v<=1440).map(Math.round);if(a.length)S.ml[m.id]=a;else delete S.ml[m.id];mi.value=(S.ml[m.id]||[]).join(',');save()};
 });
+function ord(){const ids=M.map(x=>x.id);const o=S.order.filter(x=>ids.includes(x));ids.forEach(x=>{if(!o.includes(x))o.push(x)});return o}
+function applyOrder(){ord().forEach(id=>grid.appendChild(st[id].el))}
+function moveM(id,dir){const o=ord(),i=o.indexOf(id);let j=i+dir;while(j>=0&&j<o.length&&S.hide.includes(o[j]))j+=dir;if(j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];S.order=o;save();applyOrder();renderSel()}
 function applyVis(){M.forEach(m=>st[m.id].el.style.display=S.hide.includes(m.id)?'none':'')}
 function renderSel(){const s=$('sel');s.innerHTML='';
-  M.forEach(m=>{const b=document.createElement('button');b.className='chip'+(S.hide.includes(m.id)?'':' on');b.textContent=m.n;b.onclick=()=>{S.hide=S.hide.includes(m.id)?S.hide.filter(x=>x!==m.id):[...S.hide,m.id];save();renderSel();applyVis()};s.appendChild(b)});
-  [['همه',()=>S.hide=[]],['هیچ‌کدام',()=>S.hide=M.map(x=>x.id)]].forEach(([t,f])=>{const b=document.createElement('button');b.className='chip';b.textContent=t;b.onclick=()=>{f();save();renderSel();applyVis()};s.appendChild(b)})}
+  ord().map(id=>M.find(x=>x.id===id)).forEach(m=>{const b=document.createElement('button');b.className='chip'+(S.hide.includes(m.id)?'':' on');b.textContent=m.n;b.onclick=()=>{S.hide=S.hide.includes(m.id)?S.hide.filter(x=>x!==m.id):[...S.hide,m.id];save();renderSel();applyVis()};s.appendChild(b)});
+  [['همه',()=>S.hide=[]],['ترتیب اولیه',()=>{S.order=[];applyOrder()}],['هیچ‌کدام',()=>S.hide=M.map(x=>x.id)]].forEach(([t,f])=>{const b=document.createElement('button');b.className='chip';b.textContent=t;b.onclick=()=>{f();save();renderSel();applyVis()};s.appendChild(b)})}
 function fmtCd(ms){
   let s=Math.max(0,Math.floor(ms/1000));const d=Math.floor(s/86400);s%=86400;
   const h=Math.floor(s/3600),mi=Math.floor(s%3600/60),sc=s%60,p=n=>String(n).padStart(2,'0');
@@ -222,7 +227,7 @@ function tick(){
     });
   });
 }
-renderLeads();renderSel();applyVis();tick();setInterval(tick,1000);
+renderLeads();applyOrder();renderSel();applyVis();tick();setInterval(tick,1000);
 </script>
 </body>
 </html>
