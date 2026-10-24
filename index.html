@@ -34,6 +34,8 @@ label{font-size:.9rem;display:inline-flex;gap:6px;align-items:center}
 select{padding:4px 8px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit;max-width:100%}
 .ml{width:100px;padding:2px 6px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit;direction:ltr}
 .mv{background:none;border:1px solid var(--bd);color:var(--tx);border-radius:6px;cursor:pointer;font-size:.65rem;padding:0 6px;line-height:1.6}
+.px{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 2px;font-size:.85rem;direction:ltr;justify-content:flex-end}
+.q b{color:var(--mut);font-weight:600}.gain{color:var(--ok)}.loss{color:var(--bad)}
 .bell{background:none;border:0;font-size:1.2rem;cursor:pointer;opacity:.4}
 .bell.on{opacity:1}
 .t{direction:ltr;unicode-bidi:embed}
@@ -64,6 +66,7 @@ select{padding:4px 8px;border-radius:8px;border:1px solid var(--bd);background:v
 </section>
 
 <section class="panel"><h2>بازارهایی که می‌خواهی ببینی</h2><div class="row" id="sel"></div><div class="meta">بازارهای مخفی‌شده هشدار هم نمی‌دهند. در هر کارت هم می‌توانی تایمر اختصاصی بگذاری.</div></section>
+<div class="meta" id="qs"></div>
 <div class="grid" id="grid"></div>
 <p class="meta">ساعت‌ها تقریبی و مطابق ساعات عادی معاملات است؛ تعطیلات رسمی و وقفه‌های ناهار لحاظ نشده‌اند.</p>
 </main>
@@ -180,7 +183,7 @@ const grid=$('grid'),st={};
 M.forEach(m=>{
   const c=document.createElement('div');c.className='card';
   c.innerHTML=`<div class="top"><span class="name">${m.n}</span><span><span class="badge"></span> <button class="mv up" title="جلوتر">▲</button><button class="mv dn" title="عقب‌تر">▼</button> <button class="bell" title="هشدار این بازار">🔔</button></span></div>
-  <div class="meta hrs"></div><div class="meta nx"></div><div class="cd"></div><div class="meta at"></div><div class="meta hl"></div><div style="margin-top:8px"><label class="meta">تایمر اختصاصی (دقیقه، با کاما): <input class="ml" placeholder="3,20"></label></div>`;
+  <div class="px"></div><div class="meta hrs"></div><div class="meta nx"></div><div class="cd"></div><div class="meta at"></div><div class="meta hl"></div><div style="margin-top:8px"><label class="meta">تایمر اختصاصی (دقیقه، با کاما): <input class="ml" placeholder="3,20"></label></div>`;
   grid.appendChild(c);
   const bell=c.querySelector('.bell');
   const sync=()=>bell.classList.toggle('on',!S.off.includes(m.id));sync();
@@ -191,6 +194,42 @@ M.forEach(m=>{
   const mi=c.querySelector('.ml');mi.value=(S.ml[m.id]||[]).join(',');
   mi.onchange=()=>{const a=mi.value.split(/[,،\s]+/).map(Number).filter(v=>v>=1&&v<=1440).map(Math.round);if(a.length)S.ml[m.id]=a;else delete S.ml[m.id];mi.value=(S.ml[m.id]||[]).join(',');save()};
 });
+const SYM={
+ dfm:[['DFM','DFMGI.AE']],tyo:[['Nikkei','^N225']],sha:[['SSE','000001.SS']],hkg:[['Hang Seng','^HSI']],
+ fra:[['DAX','^GDAXI']],lon:[['FTSE','^FTSE']],nyse:[['S&P 500','^GSPC'],['Dow','^DJI'],['Nasdaq','^IXIC']],
+ ist:[['BIST 100','XU100.IS']],nse:[['Nifty','^NSEI']],asx:[['ASX 200','^AXJO']],
+ fx:[['EURUSD','EURUSD=X'],['GBPUSD','GBPUSD=X'],['USDJPY','JPY=X'],['USDCHF','CHF=X'],['AUDUSD','AUDUSD=X'],['USDCAD','CAD=X'],['NZDUSD','NZDUSD=X'],['EURJPY','EURJPY=X'],['GBPJPY','GBPJPY=X'],['EURGBP','EURGBP=X']],
+ gold:[['Gold','GC=F'],['Silver','SI=F']],usf:[['ES','ES=F'],['YM','YM=F'],['NQ','NQ=F']],
+ wti:[['WTI','CL=F']],xau:[['XAUUSD','XAUUSD=X']],btc:[['BTC','BTC-USD'],['ETH','ETH-USD']]
+};
+const fmtP=v=>v>=1000?v.toLocaleString('en-US',{maximumFractionDigits:2}):v>=10?v.toFixed(2):v.toFixed(4);
+async function refreshQuotes(){
+  if(!window.quoteApi){$('qs').textContent='قیمت زنده فقط در نسخه ویندوز فعال است (مرورگر اجازه دریافت قیمت نمی‌دهد).';return}
+  const all=[...new Set(Object.values(SYM).flat().map(x=>x[1]))];
+  let q={};try{q=await window.quoteApi.get(all)}catch(e){}
+  Q=q;renderBig();
+  M.forEach(m=>{const L=SYM[m.id];if(!L||L.length>3)return;const el=st[m.id].el.querySelector('.px');
+    el.innerHTML=L.map(([n,s])=>{const r=q[s];if(!r)return '<span class="q"><b>'+n+'</b> —</span>';const ch=(r.price-r.prev)/r.prev*100;
+      return '<span class="q"><b>'+n+'</b> '+fmtP(r.price)+' <span class="'+(ch>=0?'gain':'loss')+'">'+(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%</span></span>'}).join('')});
+  $('qs').textContent='آخرین به‌روزرسانی قیمت: '+new Date().toLocaleTimeString('en-GB')+' — داده Yahoo Finance، ممکن است با تأخیر و با قیمت بروکر کمی تفاوت داشته باشد.';
+}
+let Q={};
+function renderBig(){
+  M.forEach(m=>{const L=SYM[m.id];if(!L||L.length<=3)return;
+    const el=st[m.id].el.querySelector('.px');S.pair=S.pair||{};
+    const cur=L.some(x=>x[1]===S.pair[m.id])?S.pair[m.id]:null;
+    el.innerHTML='';el.style.display='block';
+    const row=document.createElement('div');row.style.cssText='display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end';
+    L.forEach(([n,s])=>{const b=document.createElement('button');b.className='chip'+(cur===s?' on':'');b.textContent=n;
+      b.onclick=()=>{S.pair[m.id]=(cur===s?null:s);save();renderBig()};row.appendChild(b)});
+    el.appendChild(row);
+    if(cur){const r=Q[cur],n=L.find(x=>x[1]===cur)[0],d=document.createElement('div');
+      d.style.cssText='margin-top:8px;padding:8px 10px;border:1px solid var(--bd);border-radius:10px;font-size:.85rem';
+      if(!r)d.textContent=n+': —';
+      else{const ch=(r.price-r.prev)/r.prev*100;
+        d.innerHTML='<b>'+n+'</b> '+fmtP(r.price)+' <span class="'+(ch>=0?'gain':'loss')+'">'+(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%</span><div class="meta">دیروز: '+fmtP(r.prev)+(r.hi?' | بالاترین امروز: '+fmtP(r.hi)+' | پایین‌ترین: '+fmtP(r.lo):'')+'</div>'}
+      el.appendChild(d)}
+  })}
 function ord(){const ids=M.map(x=>x.id);const o=S.order.filter(x=>ids.includes(x));ids.forEach(x=>{if(!o.includes(x))o.push(x)});return o}
 function applyOrder(){ord().forEach(id=>grid.appendChild(st[id].el))}
 function moveM(id,dir){const o=ord(),i=o.indexOf(id);let j=i+dir;while(j>=0&&j<o.length&&S.hide.includes(o[j]))j+=dir;if(j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];S.order=o;save();applyOrder();renderSel()}
@@ -229,7 +268,7 @@ function tick(){
     });
   });
 }
-renderLeads();applyOrder();renderSel();applyVis();tick();setInterval(tick,1000);
+renderLeads();applyOrder();renderSel();applyVis();refreshQuotes();setInterval(refreshQuotes,60000);tick();setInterval(tick,1000);
 </script>
 </body>
 </html>
