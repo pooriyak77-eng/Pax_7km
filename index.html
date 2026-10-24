@@ -206,18 +206,42 @@ const SYM={
  ist:[['BIST 100','XU100.IS']],nse:[['Nifty','^NSEI']],asx:[['ASX 200','^AXJO']],
  fx:[['EURUSD','EURUSD=X'],['GBPUSD','GBPUSD=X'],['USDJPY','JPY=X'],['USDCHF','CHF=X'],['AUDUSD','AUDUSD=X'],['USDCAD','CAD=X'],['NZDUSD','NZDUSD=X'],['EURJPY','EURJPY=X'],['GBPJPY','GBPJPY=X'],['EURGBP','EURGBP=X']],
  gold:[['Gold','GC=F'],['Silver','SI=F']],usf:[['ES','ES=F'],['YM','YM=F'],['NQ','NQ=F']],
- wti:[['WTI','CL=F']],xau:[['XAUUSD','XAUUSD=X']],btc:[['BTC','BTC-USD'],['ETH','ETH-USD'],['LTC','LTC-USD']]
+ wti:[['WTI','CL=F']],xau:[['XAUUSD','XAUUSD=X']],btc:[['BTCUSDT','BTC-USD'],['ETHUSDT','ETH-USD'],['LTCUSDT','LTC-USD']]
 };
 const fmtP=v=>v>=1000?v.toLocaleString('en-US',{maximumFractionDigits:2}):v>=10?v.toFixed(2):v.toFixed(4);
-async function refreshQuotes(){
-  if(!window.quoteApi){$('qs').textContent='قیمت زنده فقط در نسخه ویندوز فعال است (مرورگر اجازه دریافت قیمت نمی‌دهد).';return}
-  const all=[...new Set(Object.values(SYM).flat().map(x=>x[1]))];
-  let q={};try{q=await window.quoteApi.get(all)}catch(e){}
-  Q=q;renderBig();checkPA();
+let lastFull=0,ws=null;
+const BIN={'BTC-USD':'btcusdt','ETH-USD':'ethusdt','LTC-USD':'ltcusdt'};
+async function getQ(s){if(window.quoteApi)return window.quoteApi.get(s);const r=await fetch('/api/quotes?s='+encodeURIComponent(s.join(',')));return r.json()}
+function renderPx(){
   M.forEach(m=>{const L=SYM[m.id];if(!L||L.length>3)return;const el=st[m.id].el.querySelector('.px');
-    el.innerHTML=L.map(([n,s])=>{const r=q[s];if(!r)return '<span class="q"><b>'+n+'</b> —</span>';const ch=(r.price-r.prev)/r.prev*100;
+    el.innerHTML=L.map(([n,s])=>{const r=Q[s];if(!r||!r.prev)return '<span class="q"><b>'+n+'</b> —</span>';const ch=(r.price-r.prev)/r.prev*100;
       return '<span class="q"><b>'+n+'</b> '+fmtP(r.price)+' <span class="'+(ch>=0?'gain':'loss')+'">'+(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%</span></span>'}).join('')});
-  $('qs').textContent='آخرین به‌روزرسانی قیمت: '+new Date().toLocaleTimeString('en-GB')+' — داده Yahoo Finance، ممکن است با تأخیر و با قیمت بروکر کمی تفاوت داشته باشد.';
+  renderBig();
+}
+function mergeQ(q){Object.keys(q).forEach(s=>{const o=Q[s]||{},n=Object.assign({},q[s]);
+  if(o.ws&&Date.now()-o.ws<15000){n.price=o.price;n.ws=o.ws}
+  Q[s]=Object.assign({},o,n)})}
+function startWS(){
+  if(!window.WebSocket||ws)return;
+  const rev={};Object.entries(BIN).forEach(([k,v])=>rev[v.toUpperCase()]=k);
+  try{ws=new WebSocket('wss://stream.binance.com:9443/stream?streams='+Object.values(BIN).map(x=>x+'@miniTicker').join('/'))}catch(e){ws=null;return}
+  let t=0;
+  ws.onmessage=ev=>{try{const d=JSON.parse(ev.data).data,s=rev[d.s];if(!s)return;const o=Q[s]||{};
+    Q[s]=Object.assign({},o,{price:parseFloat(d.c),prev:o.prev||parseFloat(d.o),ws:Date.now()});
+    const n=Date.now();if(n-t>1000){t=n;renderPx();checkPA()}}catch(e){}};
+  ws.onclose=()=>{ws=null;setTimeout(startWS,5000)};
+  ws.onerror=()=>{try{ws.close()}catch(e){}};
+}
+async function refreshQuotes(full){
+  if(!window.quoteApi&&!window.WEB_API){$('qs').textContent='قیمت زنده فقط در نسخه ویندوز و سایت فعال است (مرورگر اجازه دریافت قیمت نمی‌دهد).';return}
+  const now=Date.now(),needFull=full===true||!lastFull||now-lastFull>60000,syms=new Set();
+  M.filter(m=>SYM[m.id]&&!S.hide.includes(m.id)).forEach(m=>{if(needFull||isOpen(m,now))SYM[m.id].forEach(x=>syms.add(x[1]))});
+  (S.pa||[]).forEach(a=>{if(!a.done)syms.add(a.sym)});
+  if(needFull)lastFull=now;
+  if(!syms.size)return;
+  let q={};try{q=await getQ([...syms])}catch(e){}
+  mergeQ(q);renderPx();checkPA();
+  $('qs').textContent='● آخرین دریافت: '+new Date().toLocaleTimeString('en-GB')+' — رمزارزها لحظه‌ای (Binance)، بقیه هر ۱۰ ثانیه از Yahoo Finance (بازارهای باز)؛ بعضی شاخص‌ها ممکن است تا ۱۵ دقیقه تأخیر داشته باشند. درصد، تغییر روزانه نسبت به بسته‌شدن دیروز است.';
 }
 function openHub(mid){
   S.pa=S.pa||[];const MK=M.filter(m=>SYM[m.id]);
@@ -343,7 +367,7 @@ function tick(){
     });
   });
 }
-renderLeads();applyOrder();renderSel();applyVis();syncBells();$('hub').onclick=()=>openHub();refreshQuotes();setInterval(refreshQuotes,60000);tick();setInterval(tick,1000);
+renderLeads();applyOrder();renderSel();applyVis();syncBells();$('hub').onclick=()=>openHub();if(window.quoteApi||window.WEB_API)startWS();refreshQuotes(true);setInterval(()=>refreshQuotes(),10000);tick();setInterval(tick,1000);
 </script>
 </body>
 </html>
