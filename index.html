@@ -209,27 +209,48 @@ const SYM={
  wti:[['WTI','CL=F']],xau:[['XAUUSD','XAUUSD=X']],btc:[['BTCUSDT','BTC-USD'],['ETHUSDT','ETH-USD'],['LTCUSDT','LTC-USD']]
 };
 const fmtP=v=>v>=1000?v.toLocaleString('en-US',{maximumFractionDigits:2}):v>=10?v.toFixed(2):v.toFixed(4);
-let lastFull=0,ws=null;
+let lastFull=0,ws=null,wsIdx=0,pbBusy=false,pbNext=0,bIdx=0;
+const WSH=['wss://stream.binance.com:9443','wss://stream.binance.com:443','wss://data-stream.binance.vision'];
+const BEND=['https://data-api.binance.vision','https://api.binance.com','https://api1.binance.com','https://api2.binance.com','https://api3.binance.com'];
 const BIN={'BTC-USD':'btcusdt','ETH-USD':'ethusdt','LTC-USD':'ltcusdt'};
 async function getQ(s){if(window.quoteApi)return window.quoteApi.get(s);const r=await fetch('/api/quotes?s='+encodeURIComponent(s.join(',')));return r.json()}
+function dot(s){if(!BIN[s])return '';const r=Q[s],live=r&&r.ws&&Date.now()-r.ws<15000;
+  return '<span title="'+(live?'Binance (لحظه‌ای)':'Yahoo (بدون اتصال به Binance)')+'" style="color:'+(live?'var(--ok)':'var(--mut)')+'">●</span> '}
+function srcTag(L){let t='Yahoo Finance';
+  if(L.some(x=>BIN[x[1]])){const live=L.filter(x=>{const r=Q[x[1]];return r&&r.ws&&Date.now()-r.ws<15000}).length;
+    t=live===L.length?'Binance (لحظه‌ای)':live?'Binance + Yahoo':'Yahoo (به Binance وصل نیست)'}
+  return '<span class="q meta">منبع: '+t+'</span>'}
 function renderPx(){
   M.forEach(m=>{const L=SYM[m.id];if(!L||L.length>3)return;const el=st[m.id].el.querySelector('.px');
     el.innerHTML=L.map(([n,s])=>{const r=Q[s];if(!r||!r.prev)return '<span class="q"><b>'+n+'</b> —</span>';const ch=(r.price-r.prev)/r.prev*100;
-      return '<span class="q"><b>'+n+'</b> '+fmtP(r.price)+' <span class="'+(ch>=0?'gain':'loss')+'">'+(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%</span></span>'}).join('')});
+      return '<span class="q"><b>'+n+'</b> '+dot(s)+fmtP(r.price)+' <span class="'+(ch>=0?'gain':'loss')+'">'+(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%</span></span>'}).join('')+srcTag(L)});
   renderBig();
 }
 function mergeQ(q){Object.keys(q).forEach(s=>{const o=Q[s]||{},n=Object.assign({},q[s]);
   if(o.ws&&Date.now()-o.ws<15000){n.price=o.price;n.ws=o.ws}
   Q[s]=Object.assign({},o,n)})}
+async function pollBinance(){
+  const b=Q['BTC-USD'];if(ws&&ws.readyState===1&&b&&b.ws&&Date.now()-b.ws<8000)return;
+  if(pbBusy||Date.now()<pbNext)return;pbBusy=true;
+  const rev={};Object.entries(BIN).forEach(([k,v])=>rev[v.toUpperCase()]=k);
+  const syms=Object.keys(rev);let ok=false;
+  try{for(let k=0;k<BEND.length&&!ok;k++){const base=BEND[(bIdx+k)%BEND.length];
+    try{const c=new AbortController(),to=setTimeout(()=>c.abort(),4000);
+      const r=await fetch(base+'/api/v3/ticker/price?symbols='+encodeURIComponent(JSON.stringify(syms)),{signal:c.signal});clearTimeout(to);
+      if(!r.ok)continue;const j=await r.json();
+      j.forEach(x=>{const s=rev[x.symbol];if(!s)return;Q[s]=Object.assign({},Q[s],{price:parseFloat(x.price),ws:Date.now()})});
+      bIdx=(bIdx+k)%BEND.length;ok=true;renderPx();checkPA()}catch(e){}}}
+  finally{pbBusy=false;if(!ok)pbNext=Date.now()+30000}
+}
 function startWS(){
   if(!window.WebSocket||ws)return;
   const rev={};Object.entries(BIN).forEach(([k,v])=>rev[v.toUpperCase()]=k);
-  try{ws=new WebSocket('wss://stream.binance.com:9443/stream?streams='+Object.values(BIN).map(x=>x+'@miniTicker').join('/'))}catch(e){ws=null;return}
+  try{ws=new WebSocket(WSH[wsIdx%WSH.length]+'/stream?streams='+Object.values(BIN).map(x=>x+'@miniTicker').join('/'))}catch(e){ws=null;return}
   let t=0;
   ws.onmessage=ev=>{try{const d=JSON.parse(ev.data).data,s=rev[d.s];if(!s)return;const o=Q[s]||{};
     Q[s]=Object.assign({},o,{price:parseFloat(d.c),prev:o.prev||parseFloat(d.o),ws:Date.now()});
     const n=Date.now();if(n-t>1000){t=n;renderPx();checkPA()}}catch(e){}};
-  ws.onclose=()=>{ws=null;setTimeout(startWS,5000)};
+  ws.onclose=()=>{ws=null;wsIdx++;setTimeout(startWS,5000)};
   ws.onerror=()=>{try{ws.close()}catch(e){}};
 }
 async function refreshQuotes(full){
@@ -241,7 +262,7 @@ async function refreshQuotes(full){
   if(!syms.size)return;
   let q={};try{q=await getQ([...syms])}catch(e){}
   mergeQ(q);renderPx();checkPA();
-  $('qs').textContent='● آخرین دریافت: '+new Date().toLocaleTimeString('en-GB')+' — رمزارزها لحظه‌ای (Binance)، بقیه هر ۱۰ ثانیه از Yahoo Finance (بازارهای باز)؛ بعضی شاخص‌ها ممکن است تا ۱۵ دقیقه تأخیر داشته باشند. درصد، تغییر روزانه نسبت به بسته‌شدن دیروز است.';
+  $('qs').textContent='● آخرین دریافت: '+new Date().toLocaleTimeString('en-GB')+' — رمزارزها لحظه‌ای (Binance)، بقیه هر ۱۰ ثانیه از Yahoo Finance (بازارهای باز)؛ بعضی شاخص‌ها ممکن است تا ۱۵ دقیقه تأخیر داشته باشند. درصد، تغییر روزانه نسبت به بسته‌شدن دیروز است. نقطهٔ کنار رمزارزها: سبز = Binance لحظه‌ای، خاکستری = Yahoo (اتصال به Binance برقرار نیست؛ در صورت نیاز VPN روشن کن).';
 }
 function openHub(mid){
   S.pa=S.pa||[];const MK=M.filter(m=>SYM[m.id]);
@@ -260,7 +281,7 @@ function openHub(mid){
     '<div class="row" style="margin-top:12px;justify-content:flex-end"><button class="b" id="hX">بستن</button></div>';
     const hM=d.querySelector('#hM'),hS=d.querySelector('#hS'),hC=d.querySelector('#hC');
     MK.forEach(m=>hM.add(new Option(m.n,m.id)));hM.value=selM;
-    const cur=()=>{const r=Q[hS.value];hC.textContent=r?'قیمت فعلی: '+fmtP(r.price):'قیمت فعلی در دسترس نیست (فقط در نسخه ویندوز یا سایت).'};
+    const cur=()=>{const r=Q[hS.value];hC.textContent=r?'قیمت فعلی: '+fmtP(r.price)+' (منبع: '+(BIN[hS.value]&&r.ws&&Date.now()-r.ws<15000?'Binance':'Yahoo')+')':'قیمت فعلی در دسترس نیست (فقط در نسخه ویندوز یا سایت).'};
     const fillS=()=>{hS.innerHTML='';SYM[hM.value].forEach(([n,s])=>hS.add(new Option(n,s)));cur()};
     hM.onchange=()=>{selM=hM.value;fillS()};hS.onchange=cur;fillS();
     d.querySelector('#hA').onclick=()=>{const v=parseFloat(d.querySelector('#hP').value);if(!(v>0))return;const s=hS.value,n=SYM[hM.value].find(x=>x[1]===s)[0];
@@ -326,7 +347,7 @@ function renderBig(){
       d.style.cssText='margin-top:8px;padding:8px 10px;border:1px solid var(--bd);border-radius:10px;font-size:.85rem';
       if(!r)d.textContent=n+': —';
       else{const ch=(r.price-r.prev)/r.prev*100;
-        d.innerHTML='<b>'+n+'</b> '+fmtP(r.price)+' <span class="'+(ch>=0?'gain':'loss')+'">'+(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%</span><div class="meta">دیروز: '+fmtP(r.prev)+(r.hi?' | بالاترین امروز: '+fmtP(r.hi)+' | پایین‌ترین: '+fmtP(r.lo):'')+'</div>'}
+        d.innerHTML='<b>'+n+'</b> '+fmtP(r.price)+' <span class="'+(ch>=0?'gain':'loss')+'">'+(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%</span><div class="meta">منبع: Yahoo Finance | دیروز: '+fmtP(r.prev)+(r.hi?' | بالاترین امروز: '+fmtP(r.hi)+' | پایین‌ترین: '+fmtP(r.lo):'')+'</div>'}
       el.appendChild(d)}
   })}
 function ord(){const ids=M.map(x=>x.id);const o=S.order.filter(x=>ids.includes(x));ids.forEach(x=>{if(!o.includes(x))o.push(x)});return o}
@@ -367,7 +388,7 @@ function tick(){
     });
   });
 }
-renderLeads();applyOrder();renderSel();applyVis();syncBells();$('hub').onclick=()=>openHub();if(window.quoteApi||window.WEB_API)startWS();refreshQuotes(true);setInterval(()=>refreshQuotes(),10000);tick();setInterval(tick,1000);
+renderLeads();applyOrder();renderSel();applyVis();syncBells();$('hub').onclick=()=>openHub();if(window.quoteApi||window.WEB_API){startWS();pollBinance();setInterval(pollBinance,3000)}refreshQuotes(true);setInterval(()=>refreshQuotes(),10000);tick();setInterval(tick,1000);
 </script>
 </body>
 </html>
